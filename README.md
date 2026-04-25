@@ -2,7 +2,7 @@
 tags: [guide, obsidian, claude-code, karpathy, pkm, llm-wiki]
 created: 2026-04-12
 status: reference
-version: 1.0
+version: 1.1
 ---
 
 # Karpathy's LLM Wiki Stack — Complete Technical Blueprint
@@ -28,11 +28,13 @@ A comprehensive, build-ready reference for constructing a high-performance perso
 11. [Search at Scale: qmd](#11-search-at-scale-qmd)
 12. [Custom Slash Commands](#12-custom-slash-commands)
 13. [Advanced: Self-Evolving Loop](#13-advanced-self-evolving-loop)
-14. [Use Cases and Configuration Variants](#14-use-cases-and-configuration-variants)
-15. [Community Best Practices and Failure Modes](#15-community-best-practices-and-failure-modes)
-16. [Quick Start: 15-Minute Build](#16-quick-start-15-minute-build)
-17. [Known Repos and Starter Kits](#17-known-repos-and-starter-kits)
-18. [Sources](#18-sources)
+14. [Vault Evolution & Migration](#14-vault-evolution--migration)
+15. [Graph Architecture: Tree Shape Over Cluster Shape](#15-graph-architecture-tree-shape-over-cluster-shape)
+16. [Use Cases and Configuration Variants](#16-use-cases-and-configuration-variants)
+17. [Community Best Practices and Failure Modes](#17-community-best-practices-and-failure-modes)
+18. [Quick Start: 15-Minute Build](#18-quick-start-15-minute-build)
+19. [Known Repos and Starter Kits](#19-known-repos-and-starter-kits)
+20. [Sources](#20-sources)
 
 ---
 
@@ -115,6 +117,16 @@ A configuration document that tells the LLM how the wiki is structured, what con
 > "You and the LLM co-evolve this over time as you figure out what works for your domain." — Karpathy
 
 **Note:** For OpenAI Codex, use `AGENTS.md`. For OpenCode/Pi, use `OPENCODE.md`. Content is identical — only the filename changes based on which agent reads it.
+
+### The Routing Test: L1 vs L2
+
+As you maintain your stack, you must decide whether a piece of knowledge belongs in the **L1 Memory directory** (Claude Code's `.claude/` or `~/.agents/memory/`) or the **L2 Wiki** (`wiki/`).
+
+Apply the **Dangerous or Embarrassing Test**:
+- **L1 (Auto-loaded):** "Would the LLM making a mistake without this knowledge be **dangerous or embarrassing**?" (e.g., security credentials, hard behavioral constraints, "never use standard markdown links").
+- **L2 (On-demand):** "Would a mistake be merely **inconvenient**?" (e.g., a specific concept detail, a source summary).
+
+If everything goes in the wiki, the LLM may already have made a critical mistake before it "remembers" to load the relevant wiki page. Keep L1 lean, but keep it protective.
 
 ---
 
@@ -235,6 +247,8 @@ related: [[concept2]], [[entity1]]
 created: YYYY-MM-DD
 updated: YYYY-MM-DD
 confidence: high | medium | low
+cluster: {cluster-name}
+cluster_role: hub | member   # hub pages must have an "In this cluster" body section
 ---
 
 ### Entity Pages (wiki/entities/)
@@ -246,6 +260,9 @@ sources: [[source1]], [[source2]]
 related: [[concept1]], [[entity2]]
 created: YYYY-MM-DD
 updated: YYYY-MM-DD
+cluster: {cluster-name}
+contradictions: []
+open_questions: []
 ---
 
 ### Comparison Pages (wiki/comparisons/)
@@ -253,6 +270,7 @@ updated: YYYY-MM-DD
 type: comparison
 title: "Comparing X vs Y"
 sources: [[source1]], [[source2]]
+related: [[concept1]]  # Back-link upward to tier-3 member pages
 filed_from_query: true
 date: YYYY-MM-DD
 ---
@@ -262,6 +280,7 @@ date: YYYY-MM-DD
 type: synthesis
 title: "Synthesis Title"
 sources: [[source1]], [[source2]]
+related: [[concept1]]  # REQUIRED: Back-link upward to tier-3 member pages
 filed_from_query: true
 date: YYYY-MM-DD
 ---
@@ -271,10 +290,14 @@ When I say "ingest [filename]" or "ingest raw/[path]":
 1. Read the source file from raw/.
 2. Discuss key takeaways with me (3–5 bullet points).
 3. Create wiki/sources/summary-{slug}.md with full summary.
-4. Update wiki/index.md — add new page with one-line summary.
+4. Update wiki/index.md — add new page under its cluster section.
 5. Update ALL relevant concept and entity pages with new info.
-6. If new info contradicts an existing page, flag it explicitly.
+6. If new info contradicts an existing page, flag it explicitly using a > [!contradiction] callout block.
 7. Create new concept/entity pages if the source introduces them.
+   - Assign each new page a `cluster:` field.
+   - If the page is a hub (`cluster_role: hub`), add an `## In this cluster` body section listing members.
+   - If the page is a member, link it from its cluster hub's `## In this cluster` table.
+   - If a new cluster is needed, add it to wiki/index.md and wiki/overview.md.
 8. Append a structured entry to wiki/log.md (see Log Format below).
 9. A single ingest should touch 5–15 wiki pages.
 
@@ -285,16 +308,23 @@ When I ask a question:
 3. Synthesize an answer with [[wiki-link]] citations.
 4. If the answer is a valuable analysis, offer to file it as a new
    page in wiki/comparisons/ or wiki/syntheses/.
+   - If a synthesis is filed, add a `see also: [[synthesis-slug]]` back-link to the original concept pages it drew from.
 5. Update wiki/log.md with a query entry.
 
 ## Lint Workflow
 When I say "lint" or "health check":
 1. Scan for contradictions between pages. List them.
-2. Find orphan pages (no inbound links). List them.
+2. Find orphan pages (0 inbound links). List them.
 3. List concepts mentioned 3+ times but lacking their own page.
 4. Check for stale claims that newer sources may have superseded.
-5. Suggest 3–5 new questions or sources to investigate.
-6. Append a lint entry to wiki/log.md.
+5. **Cluster health check:**
+   - Every concept/entity page has a `cluster:` field. List any missing.
+   - Every `cluster_role: hub` page has an `## In this cluster` section. List any missing.
+   - Every cluster hub is listed in wiki/index.md under its cluster section. List gaps.
+6. **Synthesis back-link check:**
+   - Every synthesis page is back-linked from the concept pages it drew on. List near-orphan syntheses (≤1 inbound link).
+7. Suggest 3–5 new questions or sources to investigate.
+8. Append a lint entry to wiki/log.md.
 
 ## Log Format
 Each log entry MUST start with this prefix for parsability:
@@ -322,6 +352,18 @@ Contradictions flagged: wiki/concepts/dense-vs-sparse.md (see note)
 
 These are the three operations Karpathy defines. Each is a complete, repeatable workflow.
 
+### The 10-Source Test for Query Readiness
+
+A common mistake is querying the wiki too early. A wiki with 90% coverage can be **actively misleading** because the LLM has high-confidence gaps — it doesn't know what it doesn't know. 
+
+**Rule:** Do not rely on the wiki for decision-making until you have reached meaningful coverage (the "10-Source Test"). Validate that the wiki yields cross-source insights before trusting its syntheses. *Empirical finding:* A 90%-finished wiki performed 17% worse than a complete one in production testing due to high-confidence gaps.
+
+### The Single-Writer Rule (Concurrency)
+
+LLM agents can suffer from silent data corruption (lost content, corrupted characters) when multiple sessions or agents write to the same wiki file simultaneously.
+
+**Rule:** Treat wiki files as a shared resource. Default to single-agent sequential writes. If you must run parallel sessions, ensure they are operating on disjoint sets of files.
+
 ### Operation 1: Ingest
 
 **Trigger:** You drop a file into `raw/` and tell Claude to process it.
@@ -339,7 +381,7 @@ Ingest raw/articles/2026-04-my-article.md
 3. Create `wiki/sources/summary-{slug}.md`.
 4. Update `wiki/index.md`.
 5. Update all relevant concept and entity pages.
-6. Flag contradictions explicitly.
+6. Flag contradictions explicitly using a > [!contradiction] callout block.
 7. Append to `wiki/log.md`.
 
 **Karpathy's preferred style:** ingest one source at a time and stay involved. Read the summaries, check updates, guide emphasis. Batch ingestion is possible but produces lower-quality cross-referencing.
@@ -462,22 +504,55 @@ Five distinct patterns exist in the community. Choose based on your use case.
 
 > **Symlink warning:** Symlinks can cause recursive indexing loops in Obsidian's sync engine and break mobile clients. If you use them, exclude symlinked directories from Obsidian's file watcher. Strategy 3 (MCP Bridge) is cleaner for cross-repo access.
 
+### Mandatory Behavioral Layer: The Karpathy Skills Plugin
+
+Regardless of the connection strategy, every LLM Wiki maintainer should install the behavioral guardrails from Karpathy's own observations on LLM coding pitfalls. This ensures the agent acts with the surgical discipline of a senior engineer.
+
+**Install via Claude Code:**
+```bash
+claude plugin marketplace add forrestchang/andrej-karpathy-skills
+claude plugin install andrej-karpathy-skills@karpathy-skills
+```
+
+This plugin enforces four core principles globally: **Think Before Coding**, **Simplicity First**, **Surgical Changes**, and **Goal-Driven Execution**.
+
 ---
 
 ## 8. The Obsidian CLI Advantage
 
 Obsidian 1.12 introduced a native CLI that provides programmatic access to Obsidian's internal caching database — bypassing OS-level filesystem searches entirely.
 
-### Benchmarks
+### Benchmarks: Methodology & Provenance
 
-| Operation | grep / glob | Obsidian CLI | Speedup |
-| :--- | :--- | :--- | :--- |
-| Orphan note detection | 15.6s | 0.26s | **54×** |
-| Global vault search | 1.95s | 0.32s | **6×** |
+The following performance metrics are derived from community testing and typical tokenization patterns:
 
-### Why This Matters
+- **54× CLI Speedup:** Benchmarked by [@drrobcincotta] on a 4,663-file, 16 GB research vault. Compares native Obsidian SQLite cache access vs. standard `grep` / `glob` filesystem scans.
+- **3× Token Efficiency (Defuddle):** A "Chrome-to-Content Ratio" based on typical web articles (2k–6k tokens) vs. clean markdown content (400–1,200 tokens).
+- **60%+ Token Reduction (qmd):** Reported by Kevin Lee and ArtemXTech. Compares semantic pre-loading (reading only the top 5 relevant pages) vs. naive whole-vault indexing or unranked keyword search.
 
-Claude Code can shell out to the Obsidian CLI instead of using grep/glob for vault searches. At a wiki with 200+ pages, this makes operations that would time out (or consume a full context window in file-by-file reads) instantaneous.
+---
+
+### Plugin Stability & The Filesystem Fallback
+
+Third-party plugins (`qmd`, `obsidian-skills`, `cli-patch`) are performance accelerators, not core requirements. To ensure vault stability across tool updates:
+
+**The Fallback Rule:** If any plugin, MCP server, or CLI command returns an error, returns empty data silently, or hangs for >10 seconds, the agent MUST fallback to standard Unix tools:
+- **Search Fallback:** Use `ripgrep` (`rg`) or `grep -r` for keyword discovery.
+- **Read Fallback:** Use `cat` or `read_file` for direct filesystem access.
+- **Write Fallback:** Use `printf >>` or `write_file` for atomic append/write.
+
+*Never allow the failure of a performance tool to halt the ingestion or query pipeline.*
+
+---
+
+### Knowledge Layers: Behavioral L1 vs Wiki L2
+
+Knowledge in this stack is stored across two distinct layers:
+
+1. **L1 (Behavioral Guardrails):** Stored in \`CLAUDE.md\` or as global Claude Code plugins. This is "how the agent works." These rules are auto-loaded and enforced on every session. Use L1 for surgical maintenance rules, safety protocols, and formatting constraints.
+2. **L2 (Domain Wiki):** Stored in \`wiki/\`. This is "what the agent knows." These pages are loaded on-demand via targeted search or \`qmd\`. Use L2 for source summaries, concepts, and syntheses.
+
+**The Test:** If a piece of knowledge is needed *before* the agent starts its first operation (e.g., "always use surgical updates"), it belongs in **L1**. If it's needed *during* an operation (e.g., "what is MoE?"), it belongs in **L2**.
 
 ### Step A — Install Kepano's Official Obsidian Skills (Do This First)
 
@@ -511,7 +586,7 @@ cp -r /tmp/obsidian-skills/.claude/* .claude/
 
 > **Why this matters for the LLM Wiki specifically:** Every wiki page you build depends on correct wikilink cross-references. If Claude uses `[Concept Name](wiki/concepts/concept-name.md)` instead of `[[Concept Name]]`, your entire graph topology breaks silently — links appear correct in markdown but Obsidian's graph and backlink engine cannot parse them.
 
-### Step B — Install the CLI Silent-Failure Patch
+### Step B — Install the CLI Silent-Failure Patch (Mandatory for Automation)
 
 The Obsidian CLI 1.12 has **13 documented silent failures** — commands that exit with code `0` (success) but return empty or wrong data. This is the most dangerous class of bug for an automated wiki agent: Claude believes the command worked, receives no error, and proceeds with incorrect or missing information.
 
@@ -560,9 +635,9 @@ npx skills add jackal092927/obsidian-official-cli-skills
 
 Defuddle is an open-source library created by Kepano specifically for Obsidian Web Clipper. It strips web page chrome — ads, navigation bars, sidebars, comment sections, cookie banners, and footers — before content reaches your vault, leaving only the primary article content as clean markdown.
 
-**Why it matters for the LLM Wiki:**
+**Why it matters: 3× Token Efficiency**
 
-A raw web clip of a typical article contains 2,000–6,000 tokens of noise (navigation, related articles, social buttons, cookie notices). Defuddle reduces this to 400–1,200 tokens of clean content. At 10 ingests per week, that is 15,000–45,000 tokens saved weekly — roughly the equivalent of 10–30 extra article ingests per week at no extra cost.
+A raw web clip of a typical article contains 2,000–6,000 tokens of noise (navigation, related articles, social buttons, cookie notices). Defuddle reduces this to 400–1,200 tokens of clean content — a **3× efficiency gain**. At 10 ingests per week, that is 15,000–45,000 tokens saved weekly — roughly the equivalent of 10–30 extra article ingests per week at no extra cost.
 
 **Install:**
 ```bash
@@ -658,33 +733,106 @@ Two special files are critical infrastructure for how the LLM navigates the wiki
 
 **Purpose:** Replace RAG embedding search with a human-readable, LLM-readable catalog. At moderate scale (~100 sources, ~hundreds of pages), a well-maintained index works better than a vector database — no embedding infrastructure required.
 
-**Structure:**
+**Structure:** Cluster-organized, not a flat list. Navigation flows `index → overview → cluster hub → member page` — a tree, not a catalogue dump.
+
 ```markdown
 # Wiki Index — [Domain Name]
 
-## Concepts
-- [[attention-mechanism]] — Self-attention, multi-head variants, and recent improvements (12 sources)
-- [[mixture-of-experts]] — Sparse MoE architectures, routing strategies, efficiency benchmarks (8 sources)
-- [[scaling-laws]] — Chinchilla, Kaplan laws, compute-optimal training recipes (15 sources)
+**Navigation:** Start here → [[overview]] (cluster map) → hub concept → member pages → syntheses.
 
-## Entities
-- [[openai]] — GPT series, organizational history, research output (20 sources)
-- [[anthropic]] — Claude series, Constitutional AI, interpretability (14 sources)
+---
+
+## Cluster: {cluster-name}
+> One-line description of what this cluster covers.
+
+**Hub:** [[hub-concept]] — one-line description (N sources)
+
+| Page | Summary |
+| :--- | :--- |
+| [[member-concept-1]] | description (N sources) |
+| [[member-concept-2]] | description (N sources) |
+
+**People in this cluster:** [[entity-1]] · [[entity-2]]
+**Syntheses:** [[synthesis-1]] · [[synthesis-2]]
+
+---
+
+## Cluster: {another-cluster}
+> ...
+
+---
+
+## Syntheses
+- [[synthesis-slug]] — YYYY-MM-DD — description (N sources)
 
 ## Source Summaries
-- [[summary-moe-efficiency-2026]] — 2026-04-01 — Routing efficiency and throughput benchmarks
-- [[summary-scaling-laws-update]] — 2026-04-02 — Revised compute-optimal scaling recipes
+- [[summary-slug]] — YYYY-MM-DD — description
 
-## Comparisons & Syntheses
-- [[moe-routing-strategies]] — Routing tradeoffs across 8 sources (filed 2026-04-04)
-- [[rag-vs-finetuning]] — Practical tradeoffs for production systems
+## Navigation Files
+- [[overview]] — cluster navigation hub; start here for orientation
+- [[hot]] — rolling session context; open questions; recent operations
+- [[log]] — append-only activity record
 ```
 
-**Rule:** The LLM updates this file on EVERY ingest. It reads it first on EVERY query to identify relevant pages.
+**Rule:** The LLM updates this file on EVERY ingest, adding new pages under their cluster section. It reads it first on EVERY query to identify relevant pages.
+
+### `wiki/overview.md` — The Cluster Navigation Hub
+
+**Purpose:** Tier-1 navigation page. Humans and LLM agents read this to understand the vault's shape before drilling into a topic. Describes each cluster in 2–3 sentences and links to its hub concept. Updated after major corpus changes.
+
+```markdown
+# Wiki Overview — [Domain Name]
+
+> Cluster navigation hub. Read this before diving into any topic.
+> For the full page listing, see [[index]].
+
+---
+
+## What This Wiki Is
+
+[1–2 sentence domain description and current state: N sources, M pages, K clusters.]
+
+---
+
+## Cluster Map
+
+[ASCII or text diagram showing cluster hierarchy and navigation paths]
+
+---
+
+## Cluster: {cluster-name}
+
+**Enter at:** [[hub-concept]]
+
+[2–3 sentences: what this cluster covers, when to enter it, key questions it answers.]
+
+**Key entry points:**
+- "Question 1?" → [[page-1]]
+- "Question 2?" → [[page-2]]
+
+**Synthesis:** [[synthesis-slug]] — one-line description
+
+---
+
+## Graph Health
+
+**Last analysis:** [[graph-structure-analysis-YYYY-MM-DD]] (N pages)
+
+[One sentence on current graph shape and any known structural debt.]
+```
+
+**Rule:** `wiki/overview.md` must be linked from `wiki/index.md`. It is a navigation page — it should never be an orphan.
 
 ### `wiki/log.md` — The Activity Timeline
 
 **Purpose:** Chronological record of all operations. Gives the LLM context about what has been done recently when starting a new session. Parseable with standard Unix tools.
+
+**New Convention: The Failure Log**
+The system compounds knowledge best when it also tracks failure. Use the `!failure` tag in log entries to record:
+- Failed queries (no relevant information found).
+- Ingest errors (source too noisy, formatting broken).
+- Confirmed hallucinations found during lint.
+This ensures future sessions don't repeat the same investigative dead-ends.
 
 ```markdown
 # Activity Log
@@ -827,6 +975,9 @@ related:
 created: 2026-03-20
 updated: 2026-04-12
 confidence: high
+cluster: implementation
+contradictions: []      # List of [[source-link]] showing conflicting info
+open_questions: []      # Bullet list of unresolved gaps
 ---
 ```
 
@@ -845,18 +996,21 @@ related:
   - [[constitutional-ai]]
 created: 2026-03-01
 updated: 2026-04-10
+cluster: core-pattern
 ---
 ```
 
 **Comparison/Synthesis (`wiki/comparisons/`, `wiki/syntheses/`)**
 ```yaml
 ---
-type: comparison
+type: synthesis
 title: "MoE Routing Strategies: Top-K vs Expert-Choice vs Hash"
 sources:
   - [[summary-moe-efficiency-2026]]
   - [[summary-switch-transformer]]
   - [[summary-gshard-paper]]
+related:
+  - [[mixture-of-experts]]  # REQUIRED: Back-link upward to tier-3 member pages
 filed_from_query: true
 date: 2026-04-12
 ---
@@ -1002,68 +1156,86 @@ Run /recall at the start of any new session or topic shift.
 
 The compounding loop has three entry points. Once all three operate consistently, the wiki improves automatically without user intervention.
 
-```
-External Sources          Your Explorations         Periodic Maintenance
-      │                         │                          │
-      ▼                         ▼                          ▼
-[raw/ drop zone]       [Questions / Queries]         [Lint / Health Check]
-      │                         │                          │
-      ▼                         ▼                          ▼
-[INGEST operation]      [QUERY operation]          [LINT operation]
-      │                         │                          │
-      └──────────┬──────────────┘                          │
-                 ▼                                         │
-          [wiki/ pages updated]                            │
-          - sources/ new summaries                         │
-          - entities/ enriched                             │
-          - concepts/ revised                              │
-          - comparisons/ filed from queries                │
-          - contradictions flagged                         │
-                 │                                         │
-                 ▼                                         │
-         [wiki/index.md updated]                           │
-         [wiki/log.md appended]                            │
-                 │                                         │
-                 ▼                                         │
-       [Next query uses richer wiki]──────────────────────→▲
-```
+### Automation Safety & Recovery Protocols
 
-### Self-Evolving Review Prompt
+Automated ingestion (via hooks or batching) introduces the risk of **partial writes** and **token exhaustion**.
 
-Run this monthly for deep wiki maintenance:
+**1. The Partial Write Detection:** Before every operation, the agent should check the last entry in `wiki/log.md`. If the last entry is an "ingest" but the corresponding `wiki/sources/` page is missing or incomplete, the agent MUST flag the failure and offer to resume or rollback before starting new work.
 
-```
-Review the entire wiki for:
-1. Contradictions between pages — fix or flag with confidence: low
-2. Orphan pages — add cross-references or deprecate
-3. Concepts with 5+ mentions but no page — create them
-4. Source summary pages older than 30 days — check if new sources
-   have updated or contradicted their key claims
-5. Identify the 3 most underdeveloped areas of the wiki
-6. Suggest 5 new sources worth ingesting next
-File a summary of all changes as a new wiki/syntheses/wiki-review-{date}.md
-```
+**2. Token Budget Management:** For batch ingests (>3 files), the agent should estimate total token usage. If the estimated usage exceeds 70% of the model's output context limit, the agent MUST split the task into sequential sessions to avoid mid-file truncation.
 
-### Claude Code Hooks (Automation)
-
-Add to `.claude/settings.json` to trigger wiki updates on file save:
-
-```json
-{
-  "hooks": {
-    "on_file_save": {
-      "pattern": "raw/**",
-      "command": "Ingest the newly saved file in raw/. Update wiki accordingly."
-    }
-  }
-}
-```
-
-> **Warning:** Auto-ingest on save bypasses the human-review step of the ingest workflow. Recommended only for high-volume source pipelines. For most users, manual "ingest [file]" commands with review produce higher-quality wikis.
+**3. Hook Failure Recovery:** If a `post-save` hook fails, the agent MUST write a `!failure` entry to `wiki/log.md`. This prevents the "silent rot" of skipped ingests that would otherwise go unnoticed until the next manual lint.
 
 ---
 
-## 14. Use Cases and Configuration Variants
+## 14. Vault Evolution & Migration
+
+As your vault grows, the flat schema that worked at 10 sources will begin to saturate your context window.
+
+### Inflection Points
+
+- **10 Sources (The Validation Point):** Run your first cross-source query to confirm the compounding effect is working.
+- **50 Sources (The Structure Point):** Move from a flat `wiki/concepts/` folder to sub-folders (e.g., `concepts/methods/`, `concepts/frameworks/`) if navigation slows.
+- **100 Sources (The Search Point):** Install `qmd` and transition to semantic pre-loading. Switch from whole-vault `grep` to targeted reads.
+- **200+ Sources (The Refactor Point):** Extract heavy procedural instructions from `CLAUDE.md` into separate `agents/` or `skills/` files to maintain a lean baseline context.
+
+### The "Schema Refactor" Workflow
+
+When the vault reaches an inflection point, run the following:
+```
+Analyze the current vault structure against the 200-source migration guide.
+Propose a new directory structure or schema refactor to improve context efficiency.
+Do not move files until the plan is approved.
+```
+
+---
+
+## 15. Graph Architecture: Tree Shape Over Cluster Shape
+
+The long-term navigability of a wiki depends on its graph topology. Without deliberate design, wikis collapse into **cluster-shaped graphs**: one gravity-well concept (usually the top-level idea) accumulates all inbound links, cross-cluster connections run only through that hub, and new pages attach wherever feels closest rather than where they structurally belong.
+
+**The target shape is a tree:**
+
+```
+Tier 0: wiki/index.md          — entry point; cluster-organized
+Tier 1: wiki/overview.md       — cluster navigation hub
+Tier 2: hub concepts           — one per cluster; list their members
+Tier 3: member concepts        — know their cluster; link up to hub
+Tier 4: wiki/sources/*         — evidence behind concepts
+Tier 5: wiki/syntheses/*       — built from tier-3; back-link upward
+```
+
+A tree shape means: given any page, a human or LLM agent can navigate upward to its cluster hub, then laterally to sibling pages, then downward to sources or syntheses — without needing to pass through a single gravity-well hub.
+
+### Why This Matters for LLM Agents
+
+When an agent loads `wiki/index.md` and sees a cluster-organized structure, it can immediately identify which cluster is relevant to the current task and read only those pages. A flat alphabetical list forces the agent to read more pages to build the same mental model — wasting tokens and degrading focus.
+
+### Cluster Design Rules
+
+1. **Assign every concept and entity a `cluster:` field** — the agent should never have to infer cluster membership from prose.
+2. **One hub per cluster** — the hub page lists all members in `## In this cluster`. Members link back up to the hub.
+3. **Syntheses are leaves, not hubs** — they draw from tier-3 pages and link back to them. Nothing should depend on a synthesis page for navigation.
+4. **Sources are evidence, not navigation** — `wiki/sources/*` pages are referenced from concept frontmatter `sources:` lists. They should not appear in `wiki/index.md` as primary navigation targets.
+5. **Cross-cluster links are allowed** — but they are secondary. The primary navigation path is the tree.
+
+### Cluster Splitting: Preventing Gravity Wells
+
+As a vault grows, hub nodes (like `llm-wiki.md`) can become "gravity wells" that accumulate too many inbound links, making them noisy and hard to navigate.
+
+**Rule:** When a hub page exceeds 15 members in its `## In this cluster` section, split the cluster. Identify a sub-theme within the members and create a new sub-hub. This maintains the tree's navigability by preventing any single node from dominating the graph topology.
+
+### Detecting Drift
+
+Run the cluster health lint checks (see Lint Workflow) after every 10 ingests. Signs of cluster drift:
+- A single concept accumulates >5× the inbound links of the next hub → split or redistribute
+- New pages created without a `cluster:` field → orphans in the making
+- Synthesis pages with ≤1 inbound link → back-link from the concept pages they drew on
+- `wiki/overview.md` has 0 inbound links → link it from `wiki/index.md`
+
+---
+
+## 16. Use Cases and Configuration Variants
 
 ### A. Research Knowledge Base
 
@@ -1113,7 +1285,7 @@ Add to `.claude/settings.json` to trigger wiki updates on file save:
 
 ---
 
-## 15. Community Best Practices and Failure Modes
+## 17. Community Best Practices and Failure Modes
 
 ### The Golden Rules
 
@@ -1160,7 +1332,7 @@ Add to `.claude/settings.json` to trigger wiki updates on file save:
 
 ---
 
-## 16. Quick Start: 15-Minute Build
+## 18. Quick Start: 15-Minute Build
 
 ### Step 1 — Provision the Directory
 
@@ -1255,11 +1427,12 @@ The wiki is now live and compounding.
 
 ---
 
-## 17. Known Repos and Starter Kits
+## 19. Known Repos and Starter Kits
 
 | Resource | Type | Notes |
 | :--- | :--- | :--- |
 | [Karpathy's original gist](https://gist.github.com/karpathy/442a6bf555914893e9891c11519de94f) | Idea file | The canonical source. Copy-paste to any LLM agent. |
+| `forrestchang/andrej-karpathy-skills` | Claude Plugin | Mandatory behavioral layer enforcing surgical coding principles |
 | `ballred/obsidian-claude-pkm` | GitHub repo | Goal cascading (yearly/monthly/weekly) variant |
 | `huytieu/COG-second-brain` | GitHub repo | Self-evolving template with hooks |
 | `ksanderer/claude-vault` | GitHub repo | Git-based cloud sync variant |
@@ -1269,7 +1442,7 @@ The wiki is now live and compounding.
 
 ---
 
-## 18. Sources
+## 20. Sources
 
 1. Andrej Karpathy, "LLM Wiki" — GitHub Gist, April 2026: https://gist.github.com/karpathy/442a6bf555914893e9891c11519de94f
 2. Antigravity.codes, "Karpathy's LLM Wiki: The Complete Guide to His Idea File," April 2026: https://antigravity.codes/blog/karpathy-llm-wiki-idea-file
@@ -1281,3 +1454,4 @@ The wiki is now live and compounding.
 8. Kepano (Steph Ango), "defuddle — Get the main content of any page as Markdown," GitHub: https://github.com/kepano/defuddle
 9. jackal092927, "obsidian-official-cli-skills — prevents 13 silent failures," Obsidian Forum, February 2026: https://forum.obsidian.md/t/open-source-agent-skill-for-obsidian-cli-prevents-13-silent-failures/111169
 10. Repovive, "Official Obsidian Skills for Claude Code," February 2026: https://repovive.com/roadmaps/claude-code/obsidian-claude-code-your-ai-powered-second-brain/obsidian-skills
+11. Forrest Chang, "andrej-karpathy-skills — Surgical coding guardrails for LLM agents," GitHub, April 2026: https://github.com/forrestchang/andrej-karpathy-skills
