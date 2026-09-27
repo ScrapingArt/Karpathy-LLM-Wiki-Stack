@@ -1,0 +1,41 @@
+# Written by `agents init`. Safe to hand-edit.
+source = "/Users/ludovic/agent-stack"
+generated = "2026-09-06T22:03:37Z"
+stack_version = "0.1.0"
+harnesses = [
+    "antigravity",
+    "claude",
+    "cline",
+    "codex",
+    "copilot",
+    "cursor",
+    "deepseek",
+]
+agents = [
+    "explorer",
+    "developer",
+    "reviewer",
+    "documenter",
+    "debug",
+    "refactor",
+    "architect",
+    "communicate",
+    "sql",
+    "infra",
+    "unit-test",
+    "autopilot",
+    "bootstrap",
+    "planner",
+    "dispatcher",
+]
+subagents = [
+    "explorer-discover",
+    "reviewer",
+    "architect-assess",
+]
+ignore_context = false
+
+[models]
+provider = "google"
+
+[models.assignments]
