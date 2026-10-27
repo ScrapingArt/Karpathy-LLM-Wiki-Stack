@@ -1498,6 +1498,7 @@ The wiki is now live and compounding.
 | `tonbistudio/llm-wiki` | Template repo | Open-source markdown template implementing the core LLM Wiki pattern (~250 stars) |
 | `lucasastorian/llmwiki` | MCP repo | Open-source MCP implementation connecting Claude accounts to write and maintain the wiki (~1,580+ stars) |
 | `nashsu/llm_wiki` | Desktop app | Cross-platform desktop application compiling and maintaining a persistent local wiki (~17,580+ stars) |
+| `openapi/gknowledge` | Desktop app / MCP server | Native GNOME (GTK 4 / Libadwaita) app implementing the three-layer pattern, with an MCP server for Claude Code and Codex (~24 stars, MIT, project started July 2026, single maintainer). Linux-only. Listed at the maintainer's request; not tested by this blueprint's authors, who do not maintain it |
 | `balukosuri/wiki-from-code-with-llm-wiki-karpathy` | GitHub repo / Hook | "Docs From Code" variant ingesting codebase changes via background git post-commit hooks |
 | `ProfSynapse/nexus` | MCP server | Model Context Protocol bridge connecting Claude Code to Obsidian (successor to `claudesidian-mcp`) |
 | `Ar9av/obsidian-wiki` | Framework repo | Framework for AI agents to build and maintain a digital brain through Obsidian (~3,370+ stars) |
